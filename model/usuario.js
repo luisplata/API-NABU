@@ -17,7 +17,9 @@ var usuario_esquema = new Schema({
 	tokens:{},
 	proyecto:{},
 	administracion:{},
-	isVerificoPass:Boolean
+	setup:{},
+	isVerificoPass:Boolean,
+	token:String
 });
 
 

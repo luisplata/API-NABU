@@ -10,7 +10,7 @@ var Company = require("../model/company").Company;
 
 route.get("/",function(req,res){
 	//mostramos todos los usuarios
-	Usuario.find({},function(err,usuarios){
+	Usuario.find().then(function(usuarios){
 		res.send(usuarios);
 	});
 });
@@ -22,11 +22,22 @@ route.post("/",function(req,res){
 	usuario.nombre = req.body.nombre;
 	usuario.pass = req.body.pass;
 
-	usuario.save().then(function(dato){
-		res.json(dato);
-	},function(err){
-		console.log(err);
-		res.json("Error "+String(err));
+	SetUp.findById(req.body.setup_id).then(function(dato){
+		if(dato){
+			usuario.setUp = dato;
+		}else{
+			setup = new SetUp();
+			setup.save().then(function(dato){
+				usuario.setUp = dato;
+			});
+		}
+
+		usuario.save().then(function(dato){
+			res.json(dato);
+		},function(err){
+			console.log(err);
+			res.json("Error "+String(err));
+		});
 	});
 });
 

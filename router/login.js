@@ -1,23 +1,36 @@
 var express = require("express");
 var route = express.Router();
 var jwt = require('jsonwebtoken');
+var entorno = require('../model/config-modules.js').config();
 
 var Usuario = require("../model/usuario").Usuario;
 var Token = require("../model/tokens").Token;
 var SetUp = require("../model/setup").SetUp;
 var Proyecto = require("../model/proyecto").Proyecto;
-var Company = require("../model/company").Company;
 
 
 route.post("/",function(req,res){
 	//buscamos al usuario con las credenciales
-	Usuario.findOne({mail:req.body.email,pass:req.body.password},
-		function(err,dato){
+	Usuario.findOne({mail:req.body.email,pass:req.body.password}).then(
+		function(dato){
 		if(dato){
-			res.json(autenticando(req.body.email));
-		}else{
-			res.json({status:404,message:"El usuario no existe"});
+			dato.token = autenticando(dato.email);
+			dato.save().then(function(dato){
+				res.json(dato);
+			},function(err){
+				res.json(err);
+			})
+			
 		}
+	},function(err){
+		res.json(err);
+	});
+});
+
+route.get("/",function(req,res){
+	validandoAutenticacion(req,res,function(respuesta){
+		res.status(respuesta.status);
+		res.json(respuesta.mensaje);
 	});
 });
 
@@ -26,36 +39,42 @@ function autenticando(username){
 		username: username
 		// ANY DATA
 	}
-
-	var token = jwt.sign(tokenData, 'Secret Password', {
-		expiresIn: 60 * 60 * 24 // expires in 24 hours
+	var token = jwt.sign(tokenData, entorno.secret, {
+		expiresIn: 60 * 60 * entorno.lifeToken // expires in 24 hours
 	});
 
 	return token;
 }
 
-function validandoAutenticacion(req){
-	var token = req.headers['authorization']
-    if(!token){
-        res.status(401).send({
-          error: "Es necesario el token de autenticación"
-        })
-        return
+function validandoAutenticacion(req,res,callback){
+	var respuesta = {status:100,mensaje:{},token:""};
+	respuesta.token = req.headers['authorization']
+    if(!respuesta.token){
+		respuesta.status = 401;
+		respuesta.mensaje="El token anda mal en el head";
+		respuesta.token="";
+		callback(respuesta);
     }
 
-    token = token.replace('Bearer ', '')
+    respuesta.token = respuesta.token.replace('Bearer ', '');
 
-    jwt.verify(token, 'Secret Password', function(err, user) {
+	jwt.verify(respuesta.token, entorno.secret, function(err, user) {
       if (err) {
-        res.status(401).send({
-          error: 'Token inválido'
-        })
+			respuesta.status = 401;
+			respuesta.mensaje="El token anda mal en el cuerpo";
+			respuesta.token="";
+			callback(respuesta);
       } else {
-        res.send({
-          message: 'Awwwww yeah!!!!'
-        })
+		//buscamos al usuario para devolver la data
+		Usuario.findOne({token:respuesta.token},"mail nombre token tipo").then(function(data){
+			respuesta.mensaje = data;
+			respuesta.status = 200;
+			callback(respuesta);
+		},function(err){
+			console.log(err);
+		});
       }
-    })
+    });
 }
 
 module.exports = route;
